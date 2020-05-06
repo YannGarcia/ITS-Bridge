@@ -1,0 +1,11 @@
+[Unit]
+Description=ETSI ITS Bridge client
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/etsi/bin/its_bridge_client - /home/etsi/etc/its_bridge/client.conf
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
