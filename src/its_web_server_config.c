@@ -16,8 +16,9 @@ extern bool daemonized;
 extern char* pid_file;
 extern state_t state;
 
-extern char* nic_its;
+extern char* its_nic;
 extern char* mac_address;
+extern char* udp_nic;
 extern char* udp_address;
 extern uint16_t udp_port;
 
@@ -102,10 +103,12 @@ static int32_t web_client_page(struct MHD_Connection *p_connection) {
   const char* page =
     "<!DOCTYPE html><html><body><h2>ITS Bridge Web Confgurator</h2><p>Please enter ETSI ITS_Bridge_client configuration:</p>"
     "<form action=\"/client_url\" method=\"POST\">"
-    "<label for=\"nic_its\">Nic ITS:</label><br>"
-    "<input type=\"text\" id=\"nic_its\" name=\"nic_its\" value=\"%s\"><br>"
+    "<label for=\"its_nic\">Nic ITS:</label><br>"
+    "<input type=\"text\" id=\"its_nic\" name=\"its_nic\" value=\"%s\"><br>"
     "<label for=\"mac_address\">Mac Address:</label><br>"
     "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"%s\"><br>"
+    "<label for=\"udp_nic\">Nic UDP:</label><br>"
+    "<input type=\"text\" id=\"udp_nic\" name=\"udp_nic\" value=\"%s\"><br>"
     "<label for=\"udp_address\">Udp Address:</label><br>"
     "<input type=\"text\" id=\"udp_address\" name=\"udp_address\" value=\"%s\"><br>"
     "<label for=\"https_port\">Udp Port:</label><br>"
@@ -120,7 +123,7 @@ static int32_t web_client_page(struct MHD_Connection *p_connection) {
   size_t size = strlen(page) * 2;
   buffer = (char*)malloc(size);
   memset((void*)buffer, 0x00, size);
-  snprintf(buffer, size, page, nic_its, mac_address, udp_address, udp_port);
+  snprintf(buffer, size, page, its_nic, mac_address, udp_nic, udp_address, udp_port);
   struct MHD_Response *response = MHD_create_response_from_buffer(strlen(buffer), (void*)(const char*)buffer, MHD_RESPMEM_PERSISTENT);
   if (!response) {
     return MHD_NO;
@@ -134,10 +137,30 @@ static int32_t web_client_page(struct MHD_Connection *p_connection) {
 
 static int32_t web_server_page(struct MHD_Connection *p_connection) {
   const char* page =
-    "<!DOCTYPE html><html><body><h2>ITS Bridge Web Confgurator</h2><p>Cient page.</p>"
+    "<!DOCTYPE html><html><body><h2>ITS Bridge Web Confgurator</h2><p>Please enter ETSI ITS_Bridge_client configuration:</p>"
+    "<form action=\"/client_url\" method=\"POST\">"
+    "<label for=\"its_nic\">Nic ITS:</label><br>"
+    "<input type=\"text\" id=\"its_nic\" name=\"its_nic\" value=\"%s\"><br>"
+    "<label for=\"mac_address\">Mac Address:</label><br>"
+    "<input type=\"text\" id=\"mac_address\" name=\"mac_address\" value=\"%s\"><br>"
+    "<label for=\"udp_nic\">Nic UDP:</label><br>"
+    "<input type=\"text\" id=\"udp_nic\" name=\"udp_nic\" value=\"%s\"><br>"
+    "<label for=\"udp_address\">Udp Address:</label><br>"
+    "<input type=\"text\" id=\"udp_address\" name=\"udp_address\" value=\"%s\"><br>"
+    "<label for=\"https_port\">Udp Port:</label><br>"
+    "<input type=\"number\" id=\"udp_port\" name=\"udp_port\" value=\"%d\"><br><br>"
+    "<input type=\"submit\" value=\"Submit\">"
+    "<input type=\"reset\">"
     "</form></body></html>";
 
-  struct MHD_Response *response = MHD_create_response_from_buffer(strlen(page), (void*)(const char*)page, MHD_RESPMEM_PERSISTENT);
+  if (buffer != NULL) {
+    free(buffer);
+  }
+  size_t size = strlen(page) * 2;
+  buffer = (char*)malloc(size);
+  memset((void*)buffer, 0x00, size);
+  snprintf(buffer, size, page, its_nic, mac_address, udp_nic, udp_address, udp_port);
+  struct MHD_Response *response = MHD_create_response_from_buffer(strlen(buffer), (void*)(const char*)buffer, MHD_RESPMEM_PERSISTENT);
   if (!response) {
     return MHD_NO;
   }
@@ -247,7 +270,7 @@ static int32_t is_authenticated(struct MHD_Connection *connection, const char *u
   int32_t authenticated;
   size_t slen;
 
-  headervalue = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Authorization");
+  headervalue = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Authorization");
   if (NULL == headervalue)
     return 0;
   if (0 != strncmp (headervalue, strbase, strlen (strbase)))
@@ -266,9 +289,9 @@ static int32_t is_authenticated(struct MHD_Connection *connection, const char *u
   if (NULL == expected_b64)
     return 0;
 
-  authenticated =
-    (strcmp (headervalue + strlen (strbase), expected_b64) == 0);
+  authenticated = (strcmp (headervalue + strlen (strbase), expected_b64) == 0);
   free (expected_b64);
+
   return authenticated;
 }
 
@@ -286,11 +309,11 @@ static int32_t post_iterator(void *coninfo_cls, enum MHD_ValueKind kind, const c
   printf(">>> post_iterator: %s:%s - %s.\n", key, data, con_info->url);
 
   if (strcmp(con_info->url, "/client_url") == 0) {
-    if (strcmp (key, "nic_its") == 0) {
-      if (nic_its != NULL) {
-        free(nic_its);
+    if (strcmp (key, "its_nic") == 0) {
+      if (its_nic != NULL) {
+        free(its_nic);
       }
-      nic_its = strdup(data);
+      its_nic = strdup(data);
     } else if (strcmp (key, "mac_address") == 0) {
       if (mac_address != NULL) {
         free(mac_address);
@@ -413,9 +436,9 @@ static void request_completed(void *cls, struct MHD_Connection *connection,
     if (strcmp(con_info->url, "/client_url") == 0) {
       printf("request_completed: Update client.conf.\n");
       /* Create a new one */
-      //save_configuration_file(client_config_file, "client", daemon_mode, 0, "mac_address", mac_address, "nic_its", nic_its, "udp_address", udp_address, "udp_protocol", "multicast", "udp_port", udp_port, -1);
+      //save_configuration_file(client_config_file, "client", daemon_mode, 0, "mac_address", mac_address, "its_nic", its_nic, "udp_nic", udp_nic, "udp_address", udp_address, "udp_protocol", "multicast", "udp_port", udp_port, -1);
       {
-        printf("save_configuration_file: nic_its:%s/%s, IP:%s:%d.\n", nic_its, mac_address, udp_address, udp_port);
+        printf("save_configuration_file: its_nic:%s/%s, IP:%s:%s:%d.\n", its_nic, mac_address, udp_nic, udp_address, udp_port);
         FILE* fp = fopen(client_config_file, "w");
         if (fp == NULL) {
           goto end;
@@ -423,7 +446,9 @@ static void request_completed(void *cls, struct MHD_Connection *connection,
         fprintf(fp, "# %s.conf sample\n", "client");
         fprintf(fp, "daemon_mode=%d\n", 0);
         fprintf(fp, "mac_address=%s\n", mac_address);
-        fprintf(fp, "nic_its=%s\n", nic_its);
+        fprintf(fp, "its_nic=%s\n", its_nic);
+        fprintf(fp, "\n");
+        fprintf(fp, "udp_nic=%s\n", udp_nic);
         fprintf(fp, "udp_address=%s\n", udp_address);
         fprintf(fp, "udp_protocol=multicast\n");
         fprintf(fp, "udp_port=%d\n", udp_port);
@@ -441,16 +466,19 @@ static void request_completed(void *cls, struct MHD_Connection *connection,
     } else if (strcmp(con_info->url, "/server_url") == 0) {
       printf("request_completed: Update server.conf.\n");
       /* Create a new one */
-      //save_configuration_file(server_config_file);
+      //save_configuration_file(client_config_file, "server", daemon_mode, 0, "mac_address", mac_address, "its_nic", its_nic, "udp_nic", udp_nic, "udp_address", udp_address, "udp_protocol", "multicast", "udp_port", udp_port, -1);
       {
+        printf("save_configuration_file: its_nic:%s/%s, IP:%s:%s:%d.\n", its_nic, mac_address, udp_nic, udp_address, udp_port);
         FILE* fp = fopen(client_config_file, "w");
         if (fp == NULL) {
           goto end;
         }
-        fprintf(fp, "# serber.conf sample\n");
+        fprintf(fp, "# server.conf sample\n");
         fprintf(fp, "daemon_mode=%d\n", 0);
         fprintf(fp, "mac_address=%s\n", mac_address);
-        fprintf(fp, "nic_its=%s\n", nic_its);
+        fprintf(fp, "its_nic=%s\n", its_nic);
+        fprintf(fp, "\n");
+        fprintf(fp, "udp_nic=%s\n", udp_nic);
         fprintf(fp, "udp_address=%s\n", udp_address);
         fprintf(fp, "udp_protocol=multicast\n");
         fprintf(fp, "udp_port=%d\n", udp_port);
@@ -533,7 +561,7 @@ int32_t main(const int32_t p_argc, char* const p_argv[]) {
     fprintf(stderr, "Failed to parse configuration file %s, exit.\n", config_file);
     goto error;
   }
-  printf("nic_its:%s/%s, IP:%s:%d.\n", nic_its, mac_address, udp_address, udp_port);
+  printf("its_nic:%s/%s, IP:%s:%d.\n", its_nic, mac_address, udp_address, udp_port);
   /* Load ITS_Bridge_server configuration file */
 
   /* Daemonize */
@@ -603,8 +631,9 @@ int32_t main(const int32_t p_argc, char* const p_argv[]) {
       free(cert_key);
     }
 
-    free(nic_its);
+    free(its_nic);
     free(mac_address);
+    free(udp_nic);
     free(udp_address);
 
     if (state == _reload) {

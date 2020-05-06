@@ -5,8 +5,9 @@
 #include "its_bridge_server.h"
 #include "utils.h"
 
-extern char* nic_its;
+extern char* its_nic;
 extern char* mac_address;
+extern char* udp_nic;
 extern char* udp_address;
 extern char* udp_protocol;
 extern char* config_file;
@@ -60,12 +61,16 @@ int main(const int32_t p_argc, char* const p_argv[]) {
       return -1;
     }
   }
-  if (nic_its == NULL) {
+  if (its_nic == NULL) {
     fprintf(stderr, "Failed to parse command line arguments: NIC ITS of ITS traffic missing, exit.\n");
     return -1;
   }
   if (mac_address == NULL) {
     fprintf(stderr, "Failed to parse command line arguments: MAC address of the OBU missing, exit.\n");
+    return -1;
+  }
+  if (udp_nic == NULL) {
+    fprintf(stderr, "Failed to parse command line arguments: NIC UDP missing, exit.\n");
     return -1;
   }
   if (udp_address == NULL) {
@@ -76,7 +81,7 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     fprintf(stderr, "Failed to parse command line arguments: UDP port missing, exit.\n");
     return -1;
   }
-  printf("nic_its:%s/%s, IP:%s:%d, %s.\n", nic_its, mac_address, udp_address, udp_port, udp_protocol);
+  printf("its_nic:%s/%s, IP:%s:%s:%d, %s.\n", its_nic, mac_address, udp_nic, udp_address, udp_port, udp_protocol);
 
   /* Daemonize */
   if (daemonized) {
@@ -102,14 +107,14 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     /* Prepare ITS traffic for packet injection */
     char error_buffer[PCAP_ERRBUF_SIZE];
     bpf_u_int32 net, mask;
-    if (pcap_lookupnet(nic_its, &net, &mask, error_buffer) != 0) {
-      fprintf(stderr, "Failed to fetch newtork address for device %s.\n", nic_its);
+    if (pcap_lookupnet(its_nic, &net, &mask, error_buffer) != 0) {
+      fprintf(stderr, "Failed to fetch newtork address for device %s.\n", its_nic);
       goto error;
     }
-    printf("Device %s Network address: %d.\n", nic_its, net);
-    pcap_t* device = pcap_open_live(nic_its, 65535/*64*1024*/, 1, 100, error_buffer);
+    printf("Device %s Network address: %d.\n", its_nic, net);
+    pcap_t* device = pcap_open_live(its_nic, 65535/*64*1024*/, 1, 100, error_buffer);
     if (device == NULL) {
-      fprintf(stderr, "Failed to open device %s.\n", nic_its);
+      fprintf(stderr, "Failed to open device %s.\n", its_nic);
       goto error;
     }
 
@@ -122,7 +127,7 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     /* Bind it to the specified NIC Ethernet */
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "eno1"); // FIXME Use a parameter
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), udp_nic);
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
       fprintf(stderr, "Failed to bind socket to %s", ifr.ifr_name);
     }
@@ -183,8 +188,9 @@ int main(const int32_t p_argc, char* const p_argv[]) {
       socket_hd = -1;
     }
     if (config_file != NULL) {
-      free(nic_its);
+      free(its_nic);
       free(mac_address);
+      free(udp_nic);
       free(udp_address);
       free(udp_protocol);
     }
@@ -194,7 +200,7 @@ int main(const int32_t p_argc, char* const p_argv[]) {
         fprintf(stderr, "Failed to parse configuration line, exit.\n");
         goto error;
       }
-      printf("Reloaded config: nic_its:%s/%s, IP:%s:%d, %s.\n", nic_its, mac_address, udp_address, udp_port, (udp_protocol == NULL) ? "unicast" : udp_protocol);
+      printf("Reloaded config: its_nic:%s/%s, IP:%s:%s:%d, %s.\n", its_nic, mac_address, udp_nic, udp_address, udp_port, (udp_protocol == NULL) ? "unicast" : udp_protocol);
 
       state = _running;
     }

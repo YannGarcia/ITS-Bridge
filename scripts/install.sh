@@ -32,6 +32,10 @@ echo "" >> /etc/profile
 echo 'export HOME=/home/$VENDOR' >> /etc/profile
 echo 'export LD_LIBRARY_PATH=${HOME}/lib:$LD_LIBRARY_PATH' >> /etc/profile
 echo 'export PATH=${HOME}/bin:$PATH' >> /etc/profile
+echo 'export HOME_BIN=${HOME}/bin' >> /etc/profile
+echo 'export HOME_LIB=${HOME}/lib' >> /etc/profile
+echo 'export HOME_INC=${HOME}/include' >> /etc/profile
+echo 'export HOME_ETC=${HOME}/etc' >> /etc/profile
 echo 'cd ${HOME}' >> /etc/profile
 
 cd /home/$VENDOR
@@ -39,7 +43,18 @@ echo "" >> ./.profile
 echo 'export HOME=/home/$VENDOR' >> ./.profile
 echo 'export LD_LIBRARY_PATH=${HOME}/lib:$LD_LIBRARY_PATH' >> ./.profile
 echo 'export PATH=${HOME}/bin:$PATH' >> ./.profile
+echo 'export HOME_BIN=${HOME}/bin' >> ./.profile
+echo 'export HOME_LIB=${HOME}/lib' >> ./.profile
+echo 'export HOME_INC=${HOME}/include' >> ./.profile
+echo 'export HOME_ETC=${HOME}/etc' >> ./.profile
 echo 'cd ${HOME}' >> ./.profile
+
+# Set correct uid & giud
+cd /home
+chown -R $VENDOR:$VENDOR ./$VENDOR
+
+# Change user
+su - $VENDOR
 
 # Install additional tools & libraries
 # openfortivpn
@@ -73,30 +88,39 @@ make install PREFIX=/home/$VENDOR
 
 # Install $VENDOR ITS Bridge
 cd /home/$VENDOR/frameworks
-
-
-cd /home/$VENDOR/frameworks/$VENDOR_bridge/objs
+git clone https://github.com/YannGarcia/ITS-Bridge.git its_bridge
+cd ./its_bridge/objs
 cmake .
 make
 make install PREFIX=/home/$VENDOR
 
-# Set correct uid & giud
-cd /home
-chown -R $VENDOR:$VENDOR ./$VENDOR
+# Back to root level
+exit
 
 # Setup Runlevels
-cd /home/$VENDOR/frameworks/$VENDOR_bridge/scripts/
-cp *.service /etc/systemd/system
+cd /home/$VENDOR/frameworks/its_bridge/scripts/
+ln -sf /home/$VENDOR/frameworks/its_bridge/scripts/openfortivpn.sh /etc/init.d/openfortivpn
+ln -sf /home/$VENDOR/frameworks/its_bridge/scripts/its_bridge_webserver.sh /etc/init.d/its_bridge_webserver
+ln -sf /home/$VENDOR/frameworks/its_bridge/scripts/its_bridge_client.sh /etc/init.d/its_bridge_client
+ln -sf /home/$VENDOR/frameworks/its_bridge/scripts/its_bridge_server.sh /etc/init.d/its_bridge_server
+update-rc.d openfortivpn defaults
+update-rc.d its_bridge_webserver defaults
+update-rc.d its_bridge_client defaults
+update-rc.d its_bridge_server defaults
 
-sudo systemctl enable $VENDOR_bridge_client
-sudo systemctl enable $VENDOR_bridge_server
-sudo systemctl enable $VENDOR_bridge_webserver
-sudo systemctl enable openfortivpn
+# Setup Runlevels
+#cd /home/$VENDOR/frameworks/$VENDOR_bridge/scripts/
+#cp *.service /etc/systemd/system
 
-sudo systemctl status $VENDOR_bridge_client
-sudo systemctl status $VENDOR_bridge_server
-sudo systemctl status $VENDOR_bridge_webserver
-sudo systemctl status openfortivpn
+#sudo systemctl enable $VENDOR_bridge_client
+#sudo systemctl enable $VENDOR_bridge_server
+#sudo systemctl enable $VENDOR_bridge_webserver
+#sudo systemctl enable openfortivpn
+
+#sudo systemctl status $VENDOR_bridge_client
+#sudo systemctl status $VENDOR_bridge_server
+#sudo systemctl status $VENDOR_bridge_webserver
+#sudo systemctl status openfortivpn
 
 # End of installation
 cd /home/$VENDOR/

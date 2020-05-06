@@ -1,7 +1,7 @@
 #include "utils.h"
 
-char* nic_its = NULL;
-char* nic_udp = NULL;
+char* its_nic = NULL;
+char* udp_nic = NULL;
 char* mac_address = NULL;
 char* udp_address = NULL;
 char* udp_protocol = NULL;
@@ -35,13 +35,13 @@ int32_t parse_params(const int p_argc, char* const p_argv[]) {
       daemonized = true;
       break;
     case 'i':
-      nic_udp = optarg;
+      udp_nic = optarg;
       break;
     case 'm':
       mac_address = optarg;
       break;
     case 'n':
-      nic_its = optarg;
+      its_nic = optarg;
       break;
     case 'p':
       udp_port = (uint16_t)atoi(optarg);
@@ -109,10 +109,10 @@ int32_t parse_config_file(const char* p_config_file) {
       }
     } else if (strcmp(key, "mac_address") == 0) {
       mac_address = strdup(value);
-    } else if (strcmp(key, "nic_its") == 0) {
-      nic_its = strdup(value);
-    } else if (strcmp(key, "nic_udp") == 0) {
-      nic_udp = strdup(value);
+    } else if (strcmp(key, "its_nic") == 0) {
+      its_nic = strdup(value);
+    } else if (strcmp(key, "udp_nic") == 0) {
+      udp_nic = strdup(value);
     } else if (strcmp(key, "udp_address") == 0) {
       udp_address = strdup(value);
     } else if (strcmp(key, "udp_protocol") == 0) {
@@ -413,13 +413,13 @@ int32_t save_configuration_file(const char *p_filename, const char* progname, ..
   } /* End of 'while' statement */
   //TODO parse_options_va (daemon, &servaddr, va);
 
-  printf("save_configuration_file: nic_its:%s/%s, IP:%s:%s:%d.\n", nic_its, mac_address, nic_udp, udp_address, udp_port);
+  printf("save_configuration_file: its_nic:%s/%s, IP:%s:%s:%d.\n", its_nic, mac_address, udp_nic, udp_address, udp_port);
 
   fprintf(fp, "# %s.conf sample\n", "client");
   fprintf(fp, "daemon_mode=%d\n", 0);
   fprintf(fp, "mac_address=%s\n", mac_address);
-  fprintf(fp, "nic_its=%s\n", nic_its);
-  fprintf(fp, "nic_udp=%s\n", nic_udp);
+  fprintf(fp, "its_nic=%s\n", its_nic);
+  fprintf(fp, "udp_nic=%s\n", udp_nic);
   fprintf(fp, "udp_address=%s\n", udp_address);
   fprintf(fp, "udp_protocol=multicast\n");
   fprintf(fp, "udp_port=%d\n", udp_port);
