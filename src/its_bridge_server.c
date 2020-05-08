@@ -127,7 +127,7 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     /* allow multiple instances to receive copies of the multicast datagrams */
     int32_t flags = 1;
     if (setsockopt(socket_hd, SOL_SOCKET, SO_REUSEADDR, (char *)&flags, sizeof(flags)) < 0) {
-      fprintf(stderr, "Failed to set SO_REUSEADDR option.\n");
+      fprintf(stderr, "Failed to set SO_REUSEADDR option: %s.\n", strerror(errno));
       close(socket_hd);
       goto error;
     }
@@ -135,7 +135,7 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_addr.sa_family = AF_INET;
-    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), udp_nic);
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", udp_nic);
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
       fprintf(stderr, "Failed to bind socket to %s.\n", ifr.ifr_name);
       close(socket_hd);

@@ -124,7 +124,7 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     /* Bind it to the specified NIC Ethernet */
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, udp_nic, sizeof(ifr.ifr_name));
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", udp_nic);
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
       fprintf(stderr, "Failed to bind socket to %s.\n", ifr.ifr_name);
       close(socket_hd);
