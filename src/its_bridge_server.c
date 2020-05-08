@@ -124,26 +124,56 @@ int main(const int32_t p_argc, char* const p_argv[]) {
       fprintf(stderr, "Failed to create UDP broadcast socket.\n");
       goto error;
     }
+    /* allow multiple instances to receive copies of the multicast datagrams */
+    int32_t flags = 1;
+    if (setsockopt(socket_hd, SOL_SOCKET, SO_REUSEADDR, (char *)&flags, sizeof(flags)) < 0) {
+      fprintf(stderr, "Failed to set SO_REUSEADDR option.\n");
+      close(socket_hd);
+      goto error;
+    }
     /* Bind it to the specified NIC Ethernet */
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
+    ifr.ifr_addr.sa_family = AF_INET;
     snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), udp_nic);
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
-      fprintf(stderr, "Failed to bind socket to %s", ifr.ifr_name);
+      fprintf(stderr, "Failed to bind socket to %s.\n", ifr.ifr_name);
+      close(socket_hd);
+      goto error;
     }
-    printf("Bound to device %s", ifr.ifr_name);
+    printf("Bound to device %s.\n", ifr.ifr_name);
     /* Configure the udp_port and ip we want to receive from */
     if (udp_protocol != NULL) {
-      int32_t flags = 1;
       if (strcmp(udp_protocol, "broadcast") == 0) {
+        int32_t flags = 1;
         if (setsockopt(socket_hd, SOL_SOCKET, SO_BROADCAST, (char*)&flags, sizeof(flags)) < 0) {
-          fprintf(stderr, "Failed to create UDP broadcast socket.\n");
+          fprintf(stderr, "Failed to set option SO_BROADCAST: %s.\n", strerror(errno));
           close(socket_hd);
           goto error;
         }
       } else if (strcmp(udp_protocol, "multicast") == 0) {
-        if (setsockopt(socket_hd, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&flags, sizeof(flags)) < 0) {
-          fprintf(stderr, "Failed to create UDP milticast socket.\n");
+        /* Get interface address */
+        if (ioctl(socket_hd, SIOCGIFADDR, &ifr) < 0) {
+          fprintf(stderr, "Failed to get interface address for %s.\n", ifr.ifr_name);
+          close(socket_hd);
+          goto error;
+        }
+        printf("Interface address for %s: %s\n", ifr.ifr_name, inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr));
+        /* Join the multicast group */
+        struct ip_mreq mreq = {0};
+        mreq.imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
+        mreq.imr_multiaddr.s_addr = inet_addr(udp_address); /* IP multicast address of group */
+        printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mreq.imr_interface));
+        printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mreq.imr_multiaddr));
+        if (setsockopt(socket_hd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+          fprintf(stderr, "Failed to set option IP_ADD_MEMBERSHIP: %s.\n", strerror(errno));
+          close(socket_hd);
+          goto error;
+        }
+        // FIXME Add IP_DROP_MEMBERSHIP
+        int32_t ttl = 16; // FIXME Use a parameter
+        if (setsockopt(socket_hd, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&ttl, sizeof(ttl)) < 0) {
+          fprintf(stderr, "Failed to set option IP_MULTICAST_TTL: %s.\n", strerror(errno));
           close(socket_hd);
           goto error;
         }
@@ -154,10 +184,10 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     /* Configure the port and ip we want to send to */
     struct sockaddr_in server_addr = {0};
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(udp_port);
     if (bind(socket_hd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-      fprintf(stderr, "Failed to bind UDP broadcast socket.\n");
+      fprintf(stderr, "Failed to bind UDP broadcast socket: %s.\n", strerror(errno));
       close(socket_hd);
       goto error;
     }

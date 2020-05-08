@@ -118,29 +118,47 @@ int main(const int32_t p_argc, char* const p_argv[]) {
   while (state != _exiting) {
     /* Prepare UDP broadcast socket to transfer ITS traffic throught router level 3 */
     if ((socket_hd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-      fprintf(stderr, "Failed to create UDP broadcast socket.\n");
+      fprintf(stderr, "Failed to create UDP broadcast socket: %s.\n", strerror(errno));
       goto error;
     }
     /* Bind it to the specified NIC Ethernet */
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), udp_nic);
+    strncpy(ifr.ifr_name, udp_nic, sizeof(ifr.ifr_name));
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
-      fprintf(stderr, "Failed to bind socket to %s", ifr.ifr_name);
+      fprintf(stderr, "Failed to bind socket to %s.\n", ifr.ifr_name);
+      close(socket_hd);
+      goto error;
     }
     printf("Bound to device %s", ifr.ifr_name);
     /* Configure the udp_port and ip we want to send to */
     if (udp_protocol != NULL) {
-      int32_t flags = 1;
       if (strcmp(udp_protocol, "broadcast") == 0) {
+        int32_t flags = 1;
         if (setsockopt(socket_hd, SOL_SOCKET, SO_BROADCAST, (char*)&flags, sizeof(flags)) < 0) {
-          fprintf(stderr, "Failed to create UDP broadcast socket.\n");
+          fprintf(stderr, "Failed to set option SO_BROADCAST: %s.\n", strerror(errno));
           close(socket_hd);
           goto error;
         }
       } else if (strcmp(udp_protocol, "multicast") == 0) {
-        if (setsockopt(socket_hd, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&flags, sizeof(flags)) < 0) {
-          fprintf(stderr, "Failed to create UDP milticast socket.\n");
+        /* Get interface address */
+        if (ioctl(socket_hd, SIOCGIFADDR, &ifr) < 0) {
+          fprintf(stderr, "Failed to get interface address: %s.\n", strerror(errno));
+          close(socket_hd);
+          goto error;
+        }
+        printf("Interface address for %s: %s\n", ifr.ifr_name, inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr));
+        /* Set local interface for outbound multicast datagrams */
+        struct in_addr addr;
+        addr.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr));
+        if(setsockopt(socket_hd, IPPROTO_IP, IP_MULTICAST_IF, (char *)&addr, sizeof(addr)) < 0) {
+          fprintf(stderr, "Failed to set IP_MULTICAST_IF option: %s.\n", strerror(errno));
+          close(socket_hd);
+          goto error;
+        }
+        int32_t ttl = 16; // FIXME Use a parameter
+        if (setsockopt(socket_hd, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&ttl, sizeof(ttl)) < 0) {
+          fprintf(stderr, "Failed to set IP_MULTICAST_TTL option: %s.\n", strerror(errno));
           close(socket_hd);
           goto error;
         }
