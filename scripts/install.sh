@@ -49,13 +49,6 @@ echo 'export HOME_INC=${HOME}/include' >> ./.profile
 echo 'export HOME_ETC=${HOME}/etc' >> ./.profile
 echo 'cd ${HOME}' >> ./.profile
 
-# Set correct uid & giud
-cd /home
-chown -R $VENDOR:$VENDOR ./$VENDOR
-
-# Change user
-su - $VENDOR
-
 # Install additional tools & libraries
 # openfortivpn
 cd /home/$VENDOR/frameworks
@@ -94,8 +87,12 @@ cmake .
 make
 make install PREFIX=/home/$VENDOR
 
-# Back to root level
-exit
+# Set correct uid & giud
+cd /home
+chown -R $VENDOR:$VENDOR ./$VENDOR
+
+# Change user
+su - $VENDOR
 
 # Setup Runlevels
 cd /home/$VENDOR/frameworks/its_bridge/scripts/
