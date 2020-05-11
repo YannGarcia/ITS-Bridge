@@ -111,12 +111,21 @@ static int32_t web_client_page(struct MHD_Connection *p_connection) {
     "<input type=\"text\" id=\"udp_nic\" name=\"udp_nic\" value=\"%s\"><br>"
     "<label for=\"udp_address\">Multicast Address:</label><br>"
     "<input type=\"text\" id=\"udp_address\" name=\"udp_address\" value=\"%s\"><br>"
-    "<label for=\"https_port\">Multicqst Port:</label><br>"
+    "<label for=\"https_port\">Multicast Port:</label><br>"
     "<input type=\"number\" id=\"udp_port\" name=\"udp_port\" value=\"%d\"><br><br>"
     "<input type=\"submit\" value=\"Submit\">"
     "<input type=\"reset\">"
     "</form></body></html>";
-
+  /* Load ITS_Bridge_client configuration file */
+  free_config_file_resources();
+  sprintf(client_config_file, "%s/client.conf", conf_path);
+  printf("Parsing file %s.\n", client_config_file);
+  if (parse_config_file(client_config_file) == -1) {
+    fprintf(stderr, "Failed to parse configuration file %s, exit.\n", config_file);
+    return MHD_NO;
+  }
+  printf("its_nic:%s/%s, IP:%s:%d.\n", its_nic, mac_address, udp_address, udp_port);
+  /* Prepare the HTML page to sent to the browser */
   if (buffer != NULL) {
     free(buffer);
   }
@@ -124,6 +133,7 @@ static int32_t web_client_page(struct MHD_Connection *p_connection) {
   buffer = (char*)malloc(size);
   memset((void*)buffer, 0x00, size);
   snprintf(buffer, size, page, its_nic, mac_address, udp_nic, udp_address, udp_port);
+  /* Wait fir the response */
   struct MHD_Response *response = MHD_create_response_from_buffer(strlen(buffer), (void*)(const char*)buffer, MHD_RESPMEM_PERSISTENT);
   if (!response) {
     return MHD_NO;
@@ -137,8 +147,8 @@ static int32_t web_client_page(struct MHD_Connection *p_connection) {
 
 static int32_t web_server_page(struct MHD_Connection *p_connection) {
   const char* page =
-    "<!DOCTYPE html><html><body><h2>ITS Bridge Web Confgurator</h2><p>Please enter ETSI ITS_Bridge_client configuration:</p>"
-    "<form action=\"/client_url\" method=\"POST\">"
+    "<!DOCTYPE html><html><body><h2>ITS Bridge Web Confgurator</h2><p>Please enter ETSI ITS_Bridge_server configuration:</p>"
+    "<form action=\"/server_url\" method=\"POST\">"
     "<label for=\"its_nic\">NIC ITS:</label><br>"
     "<input type=\"text\" id=\"its_nic\" name=\"its_nic\" value=\"%s\"><br>"
     "<label for=\"mac_address\">Mac Address:</label><br>"
@@ -146,13 +156,22 @@ static int32_t web_server_page(struct MHD_Connection *p_connection) {
     "<label for=\"udp_nic\">NIC multicast:</label><br>"
     "<input type=\"text\" id=\"udp_nic\" name=\"udp_nic\" value=\"%s\"><br>"
     "<label for=\"udp_address\">Multicast Addresses (Enter multicast address of the other vendors of your session separarated by a semi-colon):</label><br>"
-    "<input type=\"text\" id=\"udp_address\" name=\"udp_address\" value=\"%s\"><br>"
+    "<input type=\"text\" id=\"udp_address\" name=\"udp_address\" value=\"%s\" size=\"100\"><br>"
     "<label for=\"https_port\">Multicqst Port:</label><br>"
     "<input type=\"number\" id=\"udp_port\" name=\"udp_port\" value=\"%d\"><br><br>"
     "<input type=\"submit\" value=\"Submit\">"
     "<input type=\"reset\">"
     "</form></body></html>";
-
+  /* Load ITS_Bridge_server configuration file */
+  free_config_file_resources();
+  sprintf(server_config_file, "%s/server.conf", conf_path);
+  printf("Parsing file %s.\n", server_config_file);
+  if (parse_config_file(server_config_file) == -1) {
+    fprintf(stderr, "Failed to parse configuration file %s, exit.\n", config_file);
+    return MHD_NO;
+  }
+  printf("its_nic:%s/%s, IP:%s:%d.\n", its_nic, mac_address, udp_address, udp_port);
+  /* Prepare the HTML page to sent to the browser */
   if (buffer != NULL) {
     free(buffer);
   }
@@ -160,6 +179,7 @@ static int32_t web_server_page(struct MHD_Connection *p_connection) {
   buffer = (char*)malloc(size);
   memset((void*)buffer, 0x00, size);
   snprintf(buffer, size, page, its_nic, mac_address, udp_nic, udp_address, udp_port);
+  /* Wait fir the response */
   struct MHD_Response *response = MHD_create_response_from_buffer(strlen(buffer), (void*)(const char*)buffer, MHD_RESPMEM_PERSISTENT);
   if (!response) {
     return MHD_NO;
@@ -466,10 +486,10 @@ static void request_completed(void *cls, struct MHD_Connection *connection,
     } else if (strcmp(con_info->url, "/server_url") == 0) {
       printf("request_completed: Update server.conf.\n");
       /* Create a new one */
-      //save_configuration_file(client_config_file, "server", daemon_mode, 0, "mac_address", mac_address, "its_nic", its_nic, "udp_nic", udp_nic, "udp_address", udp_address, "udp_protocol", "multicast", "udp_port", udp_port, -1);
+      //save_configuration_file(server_config_file, "server", daemon_mode, 0, "mac_address", mac_address, "its_nic", its_nic, "udp_nic", udp_nic, "udp_address", udp_address, "udp_protocol", "multicast", "udp_port", udp_port, -1);
       {
         printf("save_configuration_file: its_nic:%s/%s, IP:%s:%s:%d.\n", its_nic, mac_address, udp_nic, udp_address, udp_port);
-        FILE* fp = fopen(client_config_file, "w");
+        FILE* fp = fopen(server_config_file, "w");
         if (fp == NULL) {
           goto end;
         }
@@ -554,16 +574,6 @@ int32_t main(const int32_t p_argc, char* const p_argv[]) {
   }
   printf("realm=%s, login=%s:%s, pem=%s, key=%s, conf_path=%s.\n", realm, login, password, cert_pem, cert_key, conf_path);
 
-  /* Load ITS_Bridge_client configuration file */
-  sprintf(client_config_file, "%s/client.conf", conf_path);
-  printf("Parsing file %s.\n", client_config_file);
-  if (parse_config_file(client_config_file) == -1) {
-    fprintf(stderr, "Failed to parse configuration file %s, exit.\n", config_file);
-    goto error;
-  }
-  printf("its_nic:%s/%s, IP:%s:%d.\n", its_nic, mac_address, udp_address, udp_port);
-  /* Load ITS_Bridge_server configuration file */
-
   /* Daemonize */
   if (daemonized) {
     daemonize();
@@ -631,10 +641,7 @@ int32_t main(const int32_t p_argc, char* const p_argv[]) {
       free(cert_key);
     }
 
-    free(its_nic);
-    free(mac_address);
-    free(udp_nic);
-    free(udp_address);
+    free_config_file_resources();
 
     if (state == _reload) {
       if (parse_config_file(config_file) == -1) {
@@ -648,6 +655,7 @@ int32_t main(const int32_t p_argc, char* const p_argv[]) {
 
   return 0;
  error:
+  free_config_file_resources();
   if (buffer != NULL) {
     free(buffer);
   }

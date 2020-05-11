@@ -43,6 +43,8 @@ int32_t parse_params(const int p_argc, char* const p_argv[]);
 
 int32_t parse_config_file(const char* p_config_file);
 
+void free_config_file_resources(void);
+
 char* bin2hex(char* p_hex, size_t p_hlen, const uint8_t* p_bin, size_t p_blen);
 
 void usage(const char* p_progname, const uint8_t p_role);

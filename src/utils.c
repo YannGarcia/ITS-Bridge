@@ -141,6 +141,30 @@ int32_t parse_config_file(const char* p_config_file) {
   return 0;
 }
 
+void free_config_file_resources() {
+  if (mac_address != NULL) {
+    free(mac_address);
+    mac_address = NULL;
+  }
+  if (its_nic != NULL) {
+    free(its_nic);
+    its_nic = NULL;
+  }
+  if (udp_nic != NULL) {
+    free(udp_nic);
+    udp_nic = NULL;
+  }
+  if (udp_address != NULL) {
+    free(udp_address);
+    udp_address = NULL;
+  }
+  if (udp_protocol != NULL) {
+    free(udp_protocol);
+    udp_protocol = NULL;
+  }
+  udp_port = 0;
+}
+
 char* bin2hex(char* p_hex, size_t p_hlen, const uint8_t* p_bin, size_t p_blen) {
   static const char* _hexDigits = "0123456789ABCDEF";
 	const uint8_t *b, *e;
@@ -432,10 +456,10 @@ int32_t save_configuration_file(const char *p_filename, const char* progname, ..
 
 char** str_split(const char* p_string, const char p_separator) {
   printf(">> str_split: %s - %c\n", p_string, p_separator);
-  
+
   /* Count how many elements will be extracted */
   size_t count = 0;
-  char* current = p_string;
+  char* current = (char*)p_string;
   char* previous = NULL;
   while (*current != 0x00) {
     if (p_separator == *current) {
