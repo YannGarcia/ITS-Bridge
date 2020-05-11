@@ -118,19 +118,22 @@ int main(const int32_t p_argc, char* const p_argv[]) {
   while (state != _exiting) {
     /* Prepare UDP broadcast socket to transfer ITS traffic throught router level 3 */
     if ((socket_hd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-      fprintf(stderr, "Failed to create UDP broadcast socket: %s.\n", strerror(errno));
+      fprintf(stderr, "Failed to create UDP socket: %s.\n", strerror(errno));
       goto error;
     }
     /* Bind it to the specified NIC Ethernet */
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
     snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", udp_nic);
+#ifndef __APPLE__
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
-      fprintf(stderr, "Failed to bind socket to %s.\n", ifr.ifr_name);
+      fprintf(stderr, "Failed to set option SO_BINDTODEVICE:%s.\n", strerror(errno));
+      shutdown(socket_hd, 2);
       close(socket_hd);
       goto error;
     }
-    printf("Bound to device %s", ifr.ifr_name);
+    printf("Bound to device %s.\n", ifr.ifr_name);
+#endif
     /* Configure the udp_port and ip we want to send to */
     if (udp_protocol != NULL) {
       if (strcmp(udp_protocol, "broadcast") == 0) {

@@ -429,3 +429,44 @@ int32_t save_configuration_file(const char *p_filename, const char* progname, ..
 
   return 0;
 }
+
+char** str_split(const char* p_string, const char p_separator) {
+  printf(">> str_split: %s - %c\n", p_string, p_separator);
+  
+  /* Count how many elements will be extracted */
+  size_t count = 0;
+  char* current = p_string;
+  char* previous = NULL;
+  while (*current != 0x00) {
+    if (p_separator == *current) {
+      count++;
+      previous = current;
+    }
+    current++;
+  }
+  /* Add space for trailing token */
+  count += previous < (p_string + strlen(p_string) - 1);
+  /* Add space for terminating null string */
+  count++;
+
+  char delim[2];
+  sprintf(delim, "%c", p_separator);
+  char** result = malloc(count * sizeof(char*));
+  if (result == NULL) {
+    fprintf(stderr, "str_split: %s.\n", strerror(errno));
+    return NULL;
+  }
+
+  size_t idx  = 0;
+  char* cp = strdup(p_string);
+  char* token = strtok(cp, delim);
+  while (token != NULL) {
+    *(result + idx++) = strdup(token);
+    token = strtok(NULL, delim);
+  }
+  *(result + idx) = 0;
+  free(cp);
+
+  printf("<<< %p.\n", result);
+  return result;
+}

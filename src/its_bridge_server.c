@@ -18,6 +18,7 @@ extern state_t state;
 
 bool running = false;
 int32_t socket_hd = -1;
+char** udp_addresses = NULL;
 
 #define PID_FILE_NAME  "/var/run/its_bridge_server.pid"
 #define LOCK_FILE_NAME "/var/run/its_bridge_server.lock"
@@ -28,6 +29,7 @@ int32_t socket_hd = -1;
 void sig_handler(int p_signal) {
   printf(">>> sig_handler: signal=%d.\n", p_signal);
   running = false;
+  shutdown(socket_hd, SHUT_RDWR);
   close(socket_hd);
   socket_hd = -1;
 }
@@ -38,7 +40,6 @@ void sig_usr1_handler(int p_signal) {
 }
 
 int main(const int32_t p_argc, char* const p_argv[]) {
-
   /* Sanity check */
   uid_t uid = getuid();
   if (geteuid() != uid) {
@@ -76,6 +77,12 @@ int main(const int32_t p_argc, char* const p_argv[]) {
   if (udp_address == NULL) {
     fprintf(stderr, "Failed to parse command line arguments: UDP address missing, exit.\n");
     return -1;
+  } else {
+    udp_addresses = str_split(udp_address, ';');
+    if (udp_addresses == NULL) {
+      fprintf(stderr, "Failed to parse multicqst adresses (%s), exit.\n", udp_address);
+      return -1;
+    }
   }
   if (udp_port == 0) {
     fprintf(stderr, "Failed to parse command line arguments: UDP port missing, exit.\n");
@@ -119,9 +126,10 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     }
 
     /* Create UDP brodcast listener */
+    struct ifreq ifr; /* Required for IP_DROP_MEMBERSHIP */
     socket_hd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (socket_hd == -1) {
-      fprintf(stderr, "Failed to create UDP broadcast socket.\n");
+      fprintf(stderr, "Failed to create UDP socket: %s.\n", strerror(errno));
       goto error;
     }
     /* allow multiple instances to receive copies of the multicast datagrams */
@@ -132,16 +140,17 @@ int main(const int32_t p_argc, char* const p_argv[]) {
       goto error;
     }
     /* Bind it to the specified NIC Ethernet */
-    struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_addr.sa_family = AF_INET;
     snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", udp_nic);
+#ifndef __APPLE__
     if (setsockopt(socket_hd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr.ifr_name, strlen(ifr.ifr_name)) < 0) {
-      fprintf(stderr, "Failed to bind socket to %s.\n", ifr.ifr_name);
+      fprintf(stderr, "Failed to bind to interface:%s.\n", strerror(errno));
       close(socket_hd);
       goto error;
     }
     printf("Bound to device %s.\n", ifr.ifr_name);
+#endif
     /* Configure the udp_port and ip we want to receive from */
     if (udp_protocol != NULL) {
       if (strcmp(udp_protocol, "broadcast") == 0) {
@@ -160,17 +169,20 @@ int main(const int32_t p_argc, char* const p_argv[]) {
         }
         printf("Interface address for %s: %s\n", ifr.ifr_name, inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr));
         /* Join the multicast group */
-        struct ip_mreq mreq = {0};
-        mreq.imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
-        mreq.imr_multiaddr.s_addr = inet_addr(udp_address); /* IP multicast address of group */
-        printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mreq.imr_interface));
-        printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mreq.imr_multiaddr));
-        if (setsockopt(socket_hd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
-          fprintf(stderr, "Failed to set option IP_ADD_MEMBERSHIP: %s.\n", strerror(errno));
-          close(socket_hd);
-          goto error;
+	for (int32_t i = 0; *(udp_addresses + i); i++) {
+	  struct ip_mreq mreq = {0};
+	  mreq.imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
+	  mreq.imr_multiaddr.s_addr = inet_addr(*(udp_addresses + i)); /* IP multicast address of group */
+	  printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mreq.imr_interface));
+	  printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mreq.imr_multiaddr));
+	  if (setsockopt(socket_hd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+	    fprintf(stderr, "Failed to set option IP_ADD_MEMBERSHIP: %s.\n", strerror(errno));
+	    close(socket_hd);
+	    goto error;
+	  }
+	  /* Do not free resource here - free(*(udp_addresses + i)); */
         }
-        // FIXME Add IP_DROP_MEMBERSHIP
+        /* Do not free resource here - free(udp_addresses); */
         int32_t ttl = 16; // FIXME Use a parameter
         if (setsockopt(socket_hd, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&ttl, sizeof(ttl)) < 0) {
           fprintf(stderr, "Failed to set option IP_MULTICAST_TTL: %s.\n", strerror(errno));
@@ -214,6 +226,23 @@ int main(const int32_t p_argc, char* const p_argv[]) {
 
     pcap_close(device);
     if (socket_hd != -1) {
+      if (strcmp(udp_protocol, "multicast") == 0) {
+        /* Leave the multicast group */
+	for (int32_t i = 0; *(udp_addresses + i); i++) {
+	  struct ip_mreq mreq = {0};
+	  mreq.imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
+	  mreq.imr_multiaddr.s_addr = inet_addr(*(udp_addresses + i)); /* IP multicast address of group */
+	  printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mreq.imr_interface));
+	  printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mreq.imr_multiaddr));
+	  if (setsockopt(socket_hd, IPPROTO_IP, IP_DROP_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+	    fprintf(stderr, "Failed to set option IP_DROP_MEMBERSHIP: %s.\n", strerror(errno));
+	    continue;
+	  }
+	  free(*(udp_addresses + i));
+        }
+        free(udp_addresses);
+      }
+      shutdown(socket_hd, SHUT_RDWR);
       close(socket_hd);
       socket_hd = -1;
     }
@@ -242,6 +271,10 @@ int main(const int32_t p_argc, char* const p_argv[]) {
   return 0;
 
  error:
+  for (int32_t i = 0; *(udp_addresses + i); i++) {
+    free(*(udp_addresses + i));
+  }
+  free(udp_addresses);
   unlink(PID_FILE_NAME);
   unlink(LOCK_FILE_NAME);
   return -1;
