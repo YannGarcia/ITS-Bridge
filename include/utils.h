@@ -66,3 +66,5 @@ char* load_file (const char *p_filename);
 int32_t load_binary_file(const char *p_filename, uint8_t** p_buffer, size_t* p_size);
 
 int32_t save_configuration_file(const char *p_filename, const char* progname, ...);
+
+char** str_split(const char* p_string, const char p_separator);
