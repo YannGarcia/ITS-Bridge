@@ -54,7 +54,7 @@ export(PACKAGE its_web_server_config)
 # Installation
 set_target_properties(its_bridge_client PROPERTIES PUBLIC_HEADER "../include/its_bridge_client.h;../include/utils.h")
 set_target_properties(its_bridge_server PROPERTIES PUBLIC_HEADER "../include/its_bridge_server.h;../include/utils.h")
-set_target_properties(its_web_server_config PROPERTIES PUBLIC_HEADER "../include/its_web_server_config.h;../include/utils.h")
+set_target_properties(its_web_server_config PROPERTIES PUBLIC_HEADER "../include/utils.h")
 install(
   TARGETS its_bridge_client its_bridge_server its_web_server_config
   RUNTIME DESTINATION $ENV{HOME_BIN}
@@ -74,6 +74,16 @@ add_custom_target(deinstall
   OUTPUT_VARIABLE rm_out
   RESULT_VARIABLE rm_retval
   )
+
+# Add target to build documents
+if(${DOXYGEN_FOUND})
+  add_custom_target(doc_${PROJECT_NAME}
+    COMMAND ${DOXYGEN_EXECUTABLE} ../docs/o2.cfg
+    WORKING_DIRECTORY ../docs
+    COMMENT "Generating API documentation with Doxygen"
+    VERBATIM
+    )
+endif(${DOXYGEN_FOUND})
 
 # Custom targets
 add_custom_target(distclean

@@ -1,0 +1,24 @@
+set(PACKAGES_LIST
+  $ENV{HOME}/.cmake/packages/its_bridge_client
+  $ENV{HOME}/.cmake/packages/its_bridge_server
+  $ENV{HOME}/.cmake/packages/its_web_server_config
+  )
+set(INC_LIST
+  $ENV{HOME_INC}/its_bridge_client.h $ENV{HOME_INC}/its_bridge_server.h $ENV{HOME_INC}/utils.h
+  )
+foreach(file ${PACKAGES_LIST})
+#  message (STATUS "Deinstalling \"${file}\"")
+  execute_process(
+    COMMAND "@CMAKE_COMMAND@" -E remove_directory "${file}"
+    OUTPUT_VARIABLE rm_out
+    RESULT_VARIABLE rm_retval
+    )
+endforeach()
+foreach(file ${INC_LIST})
+#  message (STATUS "Deinstalling \"${file}\"")
+  execute_process(
+    COMMAND "@CMAKE_COMMAND@" -E remove -f "${file}"
+    OUTPUT_VARIABLE rm_out
+    RESULT_VARIABLE rm_retval
+    )
+endforeach()
