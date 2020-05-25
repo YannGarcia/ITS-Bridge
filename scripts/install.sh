@@ -18,26 +18,6 @@ apt-get autoremove --purge -y
 apt-get autoclean
 
 # Install additional tools & libraries
-# openfortivpn
-cd /home/etsi/frameworks
-git clone https://github.com/adrienverge/openfortivpn.git
-cd openfortivpn
-./autogen.sh
-./configure --prefix=/home/etsi --sysconfdir=/home/etsi/etc
-make && make install
-mkdir -p /home/etsi/etc/openfortivpn
-cat > /home/etsi/frameworks/its_bridge/etc/openfortivpn.cfg <<EOF
-host = 212.234.160.11
-port = 443
-username = $1
-password = $2
-set-routes = 1
-set-dns = 1
-pppd-use-peerdns = 0
-# X509 certificate sha256 sum, trust only this one!
-trusted-cert = 394869a62b1efdec0f8546e0d8c7ecab278529b38bcc97db4f20fd873dd0672f
-EOF
-
 # libmicrohttpd
 cd /home/etsi/frameworks
 git clone https://git.gnunet.org/libmicrohttpd.git libmicrohttpd
@@ -54,6 +34,29 @@ cd ./its_bridge/objs
 cmake .
 make
 make install PREFIX=/home/etsi
+
+# openfortivpn
+cd /home/etsi/frameworks
+git clone https://github.com/adrienverge/openfortivpn.git
+cd openfortivpn
+./autogen.sh
+./configure --prefix=/home/etsi --sysconfdir=/home/etsi/etc
+make && make install
+cat > /home/etsi/frameworks/its_bridge/etc/openfortivpn.cfg <<EOF
+host = 212.234.160.11
+port = 443
+username = $1
+password = $2
+set-routes = 1
+set-dns = 1
+pppd-use-peerdns = 0
+# X509 certificate sha256 sum, trust only this one!
+trusted-cert = 394869a62b1efdec0f8546e0d8c7ecab278529b38bcc97db4f20fd873dd0672f
+EOF
+
+# Set correct uid & giud
+cd /home/etsi
+chown -R etsi:etsi ./frameworks/its_bridge ./frameworks/openfortivpn ./frameworks/libmicrohttpd $HOME_BIN $HOME_LIB $HOME_INC
 
 # Create system links
 mkdir -p /etc/its_bridge

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/etc/init.d/its_bridge_server -c /home/$VENDOR/etc/its_bridge/server.conf
+ExecStart=/etc/init.d/its_bridge_server -c /home/etsi/frameworks/its_bridge/etc/server.conf
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
