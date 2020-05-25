@@ -3,10 +3,10 @@
 set -e
 set -vx
 
-if [ $# != 3 ]
+if [ $# != 2 ]
 then
     echo "Usage: sudo install.sh <VENDOR VPN Login> <VENDOR VPN password>"
-    echo "E.g. ./install.sh yann.garcia@fscom.fr 1234567"
+    echo "E.g. sudo HOME_BIN=$HOME_BIN HOME_LIB=$HOME_LIB HOME_INC=$HOME_INC ./install.sh yann.garcia@fscom.fr 123456"
    exit -1
 fi
 
