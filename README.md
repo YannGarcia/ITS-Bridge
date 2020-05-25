@@ -20,7 +20,12 @@ The following STFs were or are currently involved in the evolutions of the ETSI 
 
 ## Installation
 
-See script/install.sh for a complete installation
+See script/install.sh for a complete installation: 
+```
+cd scripts
+sudo HOME_BIN=$HOME_BIN HOME_LIB=$HOME_LIB HOME_INC=$HOME_INC ./install.sh fscom yann.garcia@fscom.fr 123456
+```
+
 
 ## How to Report a Bug
 
