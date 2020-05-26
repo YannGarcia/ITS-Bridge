@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/etc/init.d/openfortivpn -c /home/etsi/frameworks/its_bridge/etc/server.conf
+ExecStart=/etc/init.d/openfortivpn -c /home/etsi/frameworks/its_bridge/etc/openfortivpn.conf
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
