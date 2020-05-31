@@ -454,7 +454,7 @@ int32_t save_configuration_file(const char *p_filename, const char* progname, ..
   return 0;
 }
 
-char** str_split(const char* p_string, const char p_separator) {
+char** str_split(const char* p_string, const char p_separator, size_t* p_num_addresses) {
   printf(">> str_split: %s - %c\n", p_string, p_separator);
 
   /* Count how many elements will be extracted */
@@ -491,6 +491,7 @@ char** str_split(const char* p_string, const char p_separator) {
   *(result + idx) = 0;
   free(cp);
 
+  *p_num_addresses = count - 1;
   printf("<<< %p.\n", result);
   return result;
 }

@@ -40,6 +40,7 @@ void sig_usr1_handler(int p_signal) {
 }
 
 void pcap_message_callback(u_char* p_args, const struct pcap_pkthdr* p_pkthdr, const u_char* p_packet) {
+
   if (sendto(socket_hd, p_packet, p_pkthdr->caplen, 0, (struct sockaddr*)&remote_addr, sizeof(remote_addr)) < 0) {
     fprintf(stderr, "pcap_message_callback: 'sento' failure: %s, continue.\n", strerror(errno));
   }

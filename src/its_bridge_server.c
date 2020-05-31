@@ -18,7 +18,9 @@ extern state_t state;
 
 bool running = false;
 int32_t socket_hd = -1;
+size_t num_addresses = -1;
 char** udp_addresses = NULL;
+struct ip_mreq** mreq = NULL;
 
 #define PID_FILE_NAME  "/var/run/its_bridge_server.pid"
 #define LOCK_FILE_NAME "/var/run/its_bridge_server.lock"
@@ -78,7 +80,8 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     fprintf(stderr, "Failed to parse command line arguments: UDP address missing, exit.\n");
     return -1;
   } else {
-    udp_addresses = str_split(udp_address, ';');
+    udp_addresses = str_split(udp_address, ';', &num_addresses);
+    printf("num_addresses = %ld.\n", num_addresses);
     if (udp_addresses == NULL) {
       fprintf(stderr, "Failed to parse multicqst adresses (%s), exit.\n", udp_address);
       return -1;
@@ -169,13 +172,20 @@ int main(const int32_t p_argc, char* const p_argv[]) {
         }
         printf("Interface address for %s: %s\n", ifr.ifr_name, inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr));
         /* Join the multicast group */
-	for (int32_t i = 0; *(udp_addresses + i); i++) {
-	  struct ip_mreq mreq = {0};
-	  mreq.imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
-	  mreq.imr_multiaddr.s_addr = inet_addr(*(udp_addresses + i)); /* IP multicast address of group */
-	  printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mreq.imr_interface));
-	  printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mreq.imr_multiaddr));
-	  if (setsockopt(socket_hd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+	mreq = (struct ip_mreq*)malloc(num_addresses * sizeof(struct ip_mreq*));
+	fprintf(stderr, "0000\n");
+	memset((void*)mreq, 0x00, num_addresses * sizeof(struct ip_mreq*));
+	fprintf(stderr, "1111\n");
+	for (size_t i = 0; i < num_addresses; i++) {
+	  fprintf(stderr, "2222\n");
+	  struct ip_mreq* mr = (struct ip_mreq*)malloc(sizeof(struct ip_mreq));
+	  *(mreq + i) = mr;
+	  fprintf(stderr, "3333\n");
+	  mr->imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
+	  mr->imr_multiaddr.s_addr = inet_addr(*(udp_addresses + i)); /* IP multicast address of group */
+	  printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mr->imr_interface));
+	  printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mr->imr_multiaddr));
+	  if (setsockopt(socket_hd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)mr, sizeof(struct ip_mreq)) < 0) {
 	    fprintf(stderr, "Failed to set option IP_ADD_MEMBERSHIP: %s.\n", strerror(errno));
 	    close(socket_hd);
 	    goto error;
@@ -228,19 +238,17 @@ int main(const int32_t p_argc, char* const p_argv[]) {
     if (socket_hd != -1) {
       if (strcmp(udp_protocol, "multicast") == 0) {
         /* Leave the multicast group */
-	for (int32_t i = 0; *(udp_addresses + i); i++) {
-	  struct ip_mreq mreq = {0};
-	  mreq.imr_interface.s_addr = inet_addr(inet_ntoa(((struct sockaddr_in*)&ifr.ifr_addr)->sin_addr)); /* Local address */
-	  mreq.imr_multiaddr.s_addr = inet_addr(*(udp_addresses + i)); /* IP multicast address of group */
-	  printf("mreq.imr_interface.s_addr = %s.\n", inet_ntoa(mreq.imr_interface));
-	  printf("mreq.imr_multiaddr.s_addr = %s.\n", inet_ntoa(mreq.imr_multiaddr));
-	  if (setsockopt(socket_hd, IPPROTO_IP, IP_DROP_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+	for (size_t i = 0; *(udp_addresses + i); i++) {
+	  struct ip_mreq* mr = *(mreq + i);
+	  if (setsockopt(socket_hd, IPPROTO_IP, IP_DROP_MEMBERSHIP, (char*)mr, sizeof(struct ip_mreq)) < 0) {
 	    fprintf(stderr, "Failed to set option IP_DROP_MEMBERSHIP: %s.\n", strerror(errno));
 	    continue;
 	  }
 	  free(*(udp_addresses + i));
+	  free(mr);
         }
         free(udp_addresses);
+	free(mreq);
       }
       shutdown(socket_hd, SHUT_RDWR);
       close(socket_hd);
@@ -271,10 +279,14 @@ int main(const int32_t p_argc, char* const p_argv[]) {
   return 0;
 
  error:
-  for (int32_t i = 0; *(udp_addresses + i); i++) {
+  for (size_t i = 0; *(udp_addresses + i); i++) {
     free(*(udp_addresses + i));
+    if (*(mreq + i) != NULL) {
+      free(*(mreq + i));
+    }
   }
   free(udp_addresses);
+  free(mreq);
   unlink(PID_FILE_NAME);
   unlink(LOCK_FILE_NAME);
   return -1;
